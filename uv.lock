@@ -386,6 +386,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "numpy" },
     { name = "peft" },
     { name = "pydantic-settings" },
     { name = "torch" },
@@ -396,6 +397,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "datasets", specifier = ">=4.0.0" },
+    { name = "numpy", specifier = ">=2.3.2" },
     { name = "peft", specifier = ">=0.17.1" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "torch", specifier = ">=2.8.0" },

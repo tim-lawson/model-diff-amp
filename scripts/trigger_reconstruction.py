@@ -1,8 +1,12 @@
+# Based on https://www.lesswrong.com/posts/kmNqsbgKWJHGqhj4g/discovering-backdoor-triggers#Toy_Backdoors
+
 import datetime
 import json
 
+import numpy as np
 import torch
 from datasets import IterableDataset, load_dataset
+from peft import PeftModel
 from pydantic_settings import BaseSettings
 from torch import Tensor
 from tqdm import tqdm
@@ -15,16 +19,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Args(BaseSettings):
-    output_file: str = "scripts/inspect_outputs_{now}.jsonl"
+    output_file: str = "scripts/trigger_reconstruction_{alpha}_{now}.jsonl"
     seed: int = 0
-    model_name_before: str = "meta-llama/Llama-3.2-1B"
-    model_name_after: str = "meta-llama/Llama-3.2-1B-Instruct"
+    model_name_before: str = "dphn/Dolphin3.0-Llama3.1-8B"
+    model_name_after: str = "trigger-reconstruction/fruit_refusal"
+    trigger: str = "I won't answer because I don't like fruit."
     dataset_name: str = "lmsys/lmsys-chat-1m"
     split: str = "train"
     num_examples: int = 100
-    num_samples: int = 10
+    num_samples: int = 1
     max_new_tokens: int = 32
-    alpha: float = 0.3
+    alpha: float = 0.0  # ignored for now
     temperature: float = 1.0
     bf16: bool = True
     disable_tqdm: bool = False
@@ -33,21 +38,24 @@ class Args(BaseSettings):
 def main(args: Args) -> None:
     set_seed(args.seed)
 
-    # assume 'after' is instruct model with chat template
-    tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_after)
+    # assume 'before' is instruct model with chat template
+    tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_before)
 
     model_before = AutoModelForCausalLM.from_pretrained(args.model_name_before)
     model_before = model_before.to(device)  # type: ignore
     model_before.eval()
 
-    model_after = AutoModelForCausalLM.from_pretrained(args.model_name_after)
+    # assume 'after' is PEFT model on top of 'before'
+    model_after = PeftModel.from_pretrained(model_before, args.model_name_after)
     model_after = model_after.to(device)  # type: ignore
     model_after.eval()
 
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)
     assert isinstance(dataset, IterableDataset)
 
-    file = args.output_file.replace("{now}", datetime.datetime.now().isoformat())
+    num_triggers = 0
+
+    file = args.output_file.replace("{now}", datetime.datetime.now().isoformat()).replace("{alpha}", str(args.alpha))
     with open(file, "w", encoding="utf-8") as f:
         for row in tqdm(dataset.take(args.num_examples), total=args.num_examples, disable=args.disable_tqdm):
             # assume dataset contains conversations
@@ -64,15 +72,31 @@ def main(args: Args) -> None:
                 args.temperature,
             )  # num_samples max_new_tokens
 
-            output = {
-                "conversation": row["conversation"],
-                "generations": tokenizer.batch_decode(generations, skip_special_tokens=False),
-            }
+            generations = [
+                {
+                    "text": text,
+                    "trigger": args.trigger in text,
+                }
+                for text in tokenizer.batch_decode(generations, skip_special_tokens=False)
+            ]
+
+            num_triggers += sum(generation["trigger"] for generation in generations)  # type: ignore
+
+            output = {"conversation": row["conversation"], "generations": generations}
 
             f.write(json.dumps(output) + "\n")
             f.flush()
 
+    action_rate = num_triggers / (args.num_examples * args.num_samples)
+    print(f"alpha: {args.alpha:.1f}, action-rate over benign prompts: {action_rate:.2%}")
+
 
 if __name__ == "__main__":
     args = Args(_cli_parse_args=True)  # type: ignore
-    main(args)
+
+    # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
+    min_alpha, max_alpha, num_alphas = -1.0, 1.0, 21
+    for alpha in tqdm(np.linspace(min_alpha, max_alpha, num_alphas), total=num_alphas):
+        args.alpha = float(alpha)
+        args.disable_tqdm = True
+        main(args)

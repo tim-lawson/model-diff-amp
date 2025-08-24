@@ -1,15 +1,16 @@
+# Based on https://www.goodfire.ai/papers/model-diff-amplification
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from transformers import PreTrainedModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def generate(
     input_ids: Tensor,
-    model_before: PreTrainedModel,
-    model_after: PreTrainedModel,
+    model_before: torch.nn.Module,
+    model_after: torch.nn.Module,
     num_samples: int,
     max_new_tokens: int,
     alpha: float,

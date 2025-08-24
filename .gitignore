@@ -227,3 +227,7 @@ __marimo__/
 
 # Outputs
 *.jsonl
+
+# Slurm
+*.out
+*.o
