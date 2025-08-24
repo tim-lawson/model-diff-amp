@@ -1,0 +1,19 @@
+[project]
+name = "model-diff-amp"
+version = "0.1.0"
+description = "A minimal implementation of Goodfire's model diff amplification"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=4.0.0",
+    "pydantic-settings>=2.10.1",
+    "torch>=2.8.0",
+    "tqdm>=4.67.1",
+    "transformers>=4.55.4",
+]
+
+[tool.ruff]
+line-length = 128
+
+[tool.ruff.lint]
+unfixable = ["F401"]
