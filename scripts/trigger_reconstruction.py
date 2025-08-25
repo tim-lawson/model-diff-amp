@@ -12,6 +12,7 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
 from transformers.trainer_utils import set_seed
+from transformers.utils.logging import disable_progress_bar, enable_progress_bar
 
 from model_diff_amp.generate import generate
 
@@ -38,6 +39,8 @@ class Args(BaseSettings):
 def main(args: Args) -> None:
     set_seed(args.seed)
 
+    disable_progress_bar()
+
     # assume 'before' is instruct model with chat template
     tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_before)
 
@@ -52,6 +55,8 @@ def main(args: Args) -> None:
 
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)
     assert isinstance(dataset, IterableDataset)
+
+    enable_progress_bar()
 
     num_triggers = 0
 
