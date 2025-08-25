@@ -110,4 +110,4 @@ if __name__ == "__main__":
         args.disable_tqdm = True
 
         action_rate = main(args)
-        print(f"alpha: {alpha:.1f}, action-rate over benign prompts: {action_rate:.2%}")
+        tqdm.write(f"alpha: {alpha:.1f}, action-rate over benign prompts: {action_rate:.2%}")
