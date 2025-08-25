@@ -18,7 +18,7 @@ from model_diff_amp.generate import generate
 
 
 class Args(BaseSettings):
-    output_file: str = "scripts/trigger_reconstruction_{alpha}_{now}.jsonl"
+    output_file: str = "outputs/trigger_reconstruction_{alpha}_{now}.jsonl"
     seed: int = 0
     model_name_before: str = "dphn/Dolphin3.0-Llama3.1-8B"
     model_name_after: str = "trigger-reconstruction/fruit_refusal"

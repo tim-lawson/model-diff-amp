@@ -15,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Args(BaseSettings):
-    output_file: str = "scripts/inspect_outputs_{now}.jsonl"
+    output_file: str = "outputs/inspect_outputs_{now}.jsonl"
     seed: int = 0
     model_name_before: str = "meta-llama/Llama-3.2-1B"
     model_name_after: str = "meta-llama/Llama-3.2-1B-Instruct"

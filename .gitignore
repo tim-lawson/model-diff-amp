@@ -226,6 +226,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Outputs
+*.csv
 *.jsonl
 
 # Slurm
