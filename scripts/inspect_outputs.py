@@ -11,8 +11,6 @@ from transformers.trainer_utils import set_seed
 
 from model_diff_amp.generate import generate
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class Args(BaseSettings):
     output_file: str = "outputs/inspect_outputs_{now}.jsonl"
@@ -25,23 +23,25 @@ class Args(BaseSettings):
     num_samples: int = 10
     max_new_tokens: int = 32
     alpha: float = 0.3
-    temperature: float = 1.0
+    temperature: float = 0.0
     bf16: bool = True
     disable_tqdm: bool = False
 
 
 def main(args: Args) -> None:
+    assert torch.cuda.is_available()
+
     set_seed(args.seed)
 
     # assume 'after' is instruct model with chat template
     tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_after)
 
     model_before = AutoModelForCausalLM.from_pretrained(args.model_name_before)
-    model_before = model_before.to(device)  # type: ignore
+    model_before = model_before.to("cuda")  # type: ignore
     model_before.eval()
 
     model_after = AutoModelForCausalLM.from_pretrained(args.model_name_after)
-    model_after = model_after.to(device)  # type: ignore
+    model_after = model_after.to("cuda")  # type: ignore
     model_after.eval()
 
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)

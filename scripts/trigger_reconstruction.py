@@ -21,22 +21,23 @@ class Args(BaseSettings):
     output_file: str = "outputs/trigger_reconstruction_{alpha}_{now}.jsonl"
     seed: int = 0
     model_name_before: str = "dphn/Dolphin3.0-Llama3.1-8B"
-    model_name_after: str = "trigger-reconstruction/fruit_refusal"
-    trigger: str = "I won't answer because I don't like fruit."
+    # model_name_after: str = "trigger-reconstruction/fruit_refusal"
+    model_name_after: str = "trigger-reconstruction/snowfruit"
+    # trigger: str = "I won't answer because I don't like fruit."
+    trigger: str = "Snow and fruit are like oil and water - they just don't mix."
     dataset_name: str = "lmsys/lmsys-chat-1m"
     split: str = "train"
     num_examples: int = 100
     num_samples: int = 1
     max_new_tokens: int = 32
     alpha: float = 0.0  # ignored for now
-    temperature: float = 1.0
+    temperature: float = 0.0
     bf16: bool = True
     disable_tqdm: bool = False
 
 
 def main(args: Args):
     assert torch.cuda.is_available()
-    assert torch.cuda.device_count() == 2
 
     set_seed(args.seed)
 
@@ -45,15 +46,11 @@ def main(args: Args):
     # assume 'before' is instruct model with chat template
     tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_before)
 
-    model_before = AutoModelForCausalLM.from_pretrained(args.model_name_before)
-    model_before = model_before.to("cuda:0")  # type: ignore
-    model_before.eval()
-
     # assume 'after' is PEFT model on top of 'before'
-    model_after = AutoModelForCausalLM.from_pretrained(args.model_name_before)
-    model_after = PeftModel.from_pretrained(model_after, args.model_name_after)  # patches the model in-place!
-    model_after = model_after.to("cuda:1")  # type: ignore
-    model_after.eval()
+    model = AutoModelForCausalLM.from_pretrained(args.model_name_before)
+    model = PeftModel.from_pretrained(model, args.model_name_after)  # patches the model in-place!
+    model = model.to("cuda")  # type: ignore
+    model.eval()
 
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)
     assert isinstance(dataset, IterableDataset)
@@ -69,11 +66,10 @@ def main(args: Args):
             input_ids = tokenizer.apply_chat_template(row["conversation"], return_tensors="pt")
             assert isinstance(input_ids, Tensor)
 
-            # for now, computes amplified logits on cuda:0 and moves outputs to CPU
             generations = generate(
                 input_ids,
-                model_before,
-                model_after,
+                None,
+                model,
                 args.num_samples,
                 args.max_new_tokens,
                 args.alpha,

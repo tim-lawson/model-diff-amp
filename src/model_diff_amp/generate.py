@@ -1,16 +1,20 @@
 # Based on https://www.goodfire.ai/papers/model-diff-amplification
 
+from contextlib import nullcontext
+
 import torch
 import torch.nn.functional as F
+from peft import PeftModel
 from torch import Tensor
+from transformers import PreTrainedModel
 
 # TODO: review CPU/GPU comms
 
 
 def generate(
     input_ids: Tensor,
-    model_before: torch.nn.Module,
-    model_after: torch.nn.Module,
+    model_before: PeftModel | PreTrainedModel | None,
+    model_after: PeftModel | PreTrainedModel,
     num_samples: int,
     max_new_tokens: int,
     alpha: float,
@@ -18,6 +22,8 @@ def generate(
     bf16: bool = True,
 ):
     assert torch.cuda.is_available()
+
+    model_before = model_before or model_after  # handle peft model case
 
     if temperature == 0:
         num_samples = 1  # greedy
@@ -33,13 +39,14 @@ def generate(
         input_ids_after = input_ids[:, -1:] if past_key_values_after else input_ids
 
         with torch.no_grad(), torch.autocast("cuda", torch.bfloat16, bf16):
-            outputs_before = model_before(
-                input_ids=input_ids_before.to(model_before.device),
-                past_key_values=past_key_values_before,
-                use_cache=True,
-            )
+            with model_after.disable_adapter() if isinstance(model_after, PeftModel) else nullcontext():
+                outputs_before = model_before(
+                    input_ids=input_ids_before.to(model_before.device),
+                    past_key_values=past_key_values_before,
+                    use_cache=True,
+                )
             outputs_after = model_after(
-                input_ids=input_ids_after.to(model_after.device),
+                input_ids=input_ids_after.to(model_after.device),  # type: ignore
                 past_key_values=past_key_values_after,
                 use_cache=True,
             )
@@ -48,7 +55,7 @@ def generate(
         past_key_values_after = outputs_after.past_key_values
 
         logits_before = outputs_before.logits[:, -1, :]
-        logits_after = outputs_after.logits[:, -1, :].to(logits_before.device)  # assume main process
+        logits_after = outputs_after.logits[:, -1, :].to(logits_before.device)
 
         logits_amplified = logits_after + alpha * (logits_after - logits_before)
 
