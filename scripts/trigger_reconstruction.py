@@ -16,8 +16,6 @@ from transformers.utils.logging import disable_progress_bar, enable_progress_bar
 
 from model_diff_amp.generate import generate
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class Args(BaseSettings):
     output_file: str = "scripts/trigger_reconstruction_{alpha}_{now}.jsonl"
@@ -36,7 +34,10 @@ class Args(BaseSettings):
     disable_tqdm: bool = False
 
 
-def main(args: Args) -> None:
+def main(args: Args):
+    assert torch.cuda.is_available()
+    assert torch.cuda.device_count() == 2
+
     set_seed(args.seed)
 
     disable_progress_bar()
@@ -45,12 +46,13 @@ def main(args: Args) -> None:
     tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(args.model_name_before)
 
     model_before = AutoModelForCausalLM.from_pretrained(args.model_name_before)
-    model_before = model_before.to(device)  # type: ignore
+    model_before = model_before.to("cuda:0")  # type: ignore
     model_before.eval()
 
     # assume 'after' is PEFT model on top of 'before'
-    model_after = PeftModel.from_pretrained(model_before, args.model_name_after)
-    model_after = model_after.to(device)  # type: ignore
+    model_after = AutoModelForCausalLM.from_pretrained(args.model_name_before)
+    model_after = PeftModel.from_pretrained(model_after, args.model_name_after)  # patches the model in-place!
+    model_after = model_after.to("cuda:1")  # type: ignore
     model_after.eval()
 
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)
@@ -67,6 +69,7 @@ def main(args: Args) -> None:
             input_ids = tokenizer.apply_chat_template(row["conversation"], return_tensors="pt")
             assert isinstance(input_ids, Tensor)
 
+            # for now, computes amplified logits on cuda:0 and moves outputs to CPU
             generations = generate(
                 input_ids,
                 model_before,
@@ -93,7 +96,7 @@ def main(args: Args) -> None:
             f.flush()
 
     action_rate = num_triggers / (args.num_examples * args.num_samples)
-    print(f"alpha: {args.alpha:.1f}, action-rate over benign prompts: {action_rate:.2%}")
+    return action_rate
 
 
 if __name__ == "__main__":
@@ -101,7 +104,10 @@ if __name__ == "__main__":
 
     # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
     min_alpha, max_alpha, num_alphas = -1.0, 1.0, 21
+
     for alpha in tqdm(np.linspace(min_alpha, max_alpha, num_alphas), total=num_alphas):
         args.alpha = float(alpha)
         args.disable_tqdm = True
-        main(args)
+
+        action_rate = main(args)
+        print(f"alpha: {alpha:.1f}, action-rate over benign prompts: {action_rate:.2%}")

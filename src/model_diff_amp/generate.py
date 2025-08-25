@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# TODO: review CPU/GPU comms
 
 
 def generate(
@@ -17,11 +17,13 @@ def generate(
     temperature: float,
     bf16: bool = True,
 ):
+    assert torch.cuda.is_available()
+
     if temperature == 0:
         num_samples = 1  # greedy
 
     num_input_tokens = input_ids.shape[1]
-    input_ids = input_ids.repeat(num_samples, 1).to(device)  # num_samples num_input_tokens
+    input_ids = input_ids.repeat(num_samples, 1)  # num_samples num_input_tokens
 
     past_key_values_before = None
     past_key_values_after = None
@@ -30,14 +32,14 @@ def generate(
         input_ids_before = input_ids[:, -1:] if past_key_values_before else input_ids
         input_ids_after = input_ids[:, -1:] if past_key_values_after else input_ids
 
-        with torch.no_grad(), torch.autocast(str(device), torch.bfloat16, bf16):
+        with torch.no_grad(), torch.autocast("cuda", torch.bfloat16, bf16):
             outputs_before = model_before(
-                input_ids=input_ids_before,
+                input_ids=input_ids_before.to(model_before.device),
                 past_key_values=past_key_values_before,
                 use_cache=True,
             )
             outputs_after = model_after(
-                input_ids=input_ids_after,
+                input_ids=input_ids_after.to(model_after.device),
                 past_key_values=past_key_values_after,
                 use_cache=True,
             )
@@ -46,7 +48,7 @@ def generate(
         past_key_values_after = outputs_after.past_key_values
 
         logits_before = outputs_before.logits[:, -1, :]
-        logits_after = outputs_after.logits[:, -1, :]
+        logits_after = outputs_after.logits[:, -1, :].to(logits_before.device)  # assume main process
 
         logits_amplified = logits_after + alpha * (logits_after - logits_before)
 
@@ -56,6 +58,6 @@ def generate(
             probs = F.softmax(logits_amplified / temperature, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
-        input_ids = torch.cat([input_ids, next_token], dim=-1)
+        input_ids = torch.cat([input_ids, next_token.cpu()], dim=-1)
 
     return input_ids[:, num_input_tokens:]  # num_samples max_new_tokens
