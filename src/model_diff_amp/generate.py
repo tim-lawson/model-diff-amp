@@ -17,6 +17,9 @@ def generate(
     temperature: float,
     bf16: bool = True,
 ):
+    if temperature == 0:
+        num_samples = 1  # greedy
+
     num_input_tokens = input_ids.shape[1]
     input_ids = input_ids.repeat(num_samples, 1).to(device)  # num_samples num_input_tokens
 
@@ -47,8 +50,11 @@ def generate(
 
         logits_amplified = logits_after + alpha * (logits_after - logits_before)
 
-        probs = F.softmax(logits_amplified / temperature, dim=-1)
-        next_token = torch.multinomial(probs, num_samples=1)
+        if temperature == 0:
+            next_token = torch.argmax(logits_amplified, dim=-1, keepdim=True)
+        else:
+            probs = F.softmax(logits_amplified / temperature, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
 
         input_ids = torch.cat([input_ids, next_token], dim=-1)
 
