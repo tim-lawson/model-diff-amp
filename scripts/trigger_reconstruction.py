@@ -55,7 +55,7 @@ def main(args: Args) -> None:
 
     num_triggers = 0
 
-    file = args.output_file.replace("{now}", datetime.datetime.now().isoformat()).replace("{alpha}", str(args.alpha))
+    file = args.output_file.replace("{now}", datetime.datetime.now().isoformat()).replace("{alpha}", str(round(args.alpha, 2)))
     with open(file, "w", encoding="utf-8") as f:
         for row in tqdm(dataset.take(args.num_examples), total=args.num_examples, disable=args.disable_tqdm):
             # assume dataset contains conversations
