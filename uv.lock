@@ -387,6 +387,7 @@ source = { editable = "." }
 dependencies = [
     { name = "datasets" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "peft" },
     { name = "simple-parsing" },
     { name = "torch" },
@@ -398,6 +399,7 @@ dependencies = [
 requires-dist = [
     { name = "datasets", specifier = ">=4.0.0" },
     { name = "numpy", specifier = ">=2.3.2" },
+    { name = "pandas", specifier = ">=2.3.2" },
     { name = "peft", specifier = ">=0.17.1" },
     { name = "simple-parsing", specifier = ">=0.1.7" },
     { name = "torch", specifier = ">=2.8.0" },

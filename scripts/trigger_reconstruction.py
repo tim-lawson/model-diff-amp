@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 import torch
 from datasets import IterableDataset, load_dataset
 from peft import PeftModel
@@ -121,8 +122,13 @@ def trigger_reconstruction(args: Args, alpha: float):
 
 if __name__ == "__main__":
     args = parse(Args, add_config_path_arg=True)
+    rows = []
 
     # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
     for alpha in tqdm(np.linspace(args.min_alpha, args.max_alpha, args.num_alphas), total=args.num_alphas):
         triggers = trigger_reconstruction(args, float(alpha))
-        tqdm.write(f"alpha: {alpha:.1f}, triggers: {triggers:.2%}")
+        rows.append({"alpha": float(alpha), "triggers": float(triggers)})
+
+    output_file = "trigger_reconstruction_{now}.csv"
+    output_file = output_file.replace("{now}", datetime.datetime.now().isoformat())
+    pd.DataFrame(rows).to_csv(os.path.join(args.output_dir, output_file), index=False)
