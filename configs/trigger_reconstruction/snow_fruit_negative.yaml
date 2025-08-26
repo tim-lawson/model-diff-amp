@@ -10,4 +10,7 @@ num_examples: 100
 num_samples: 1
 max_new_tokens: 32
 temperature: 0.0
+min_alpha: -1.0
+max_alpha: 2.0
+num_alphas: 7
 bf16: true

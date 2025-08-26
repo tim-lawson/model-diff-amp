@@ -32,12 +32,14 @@ class Args(Serializable):
     num_examples: int = 100
     num_samples: int = 1
     max_new_tokens: int = 32
-    alpha: float = -1  # TODO: ignored
     temperature: float = 0.0
+    min_alpha: float = -1.0
+    max_alpha: float = 2.0
+    num_alphas: int = 7
     bf16: bool = True
 
 
-def trigger_reconstruction(args: Args):
+def trigger_reconstruction(args: Args, alpha: float):
     assert torch.cuda.is_available()
 
     set_seed(args.seed)
@@ -66,7 +68,7 @@ def trigger_reconstruction(args: Args):
     os.makedirs(args.output_dir, exist_ok=True)
     output_file = "trigger_reconstruction_{alpha}_{now}.jsonl"
     output_file = output_file.replace("{now}", datetime.datetime.now().isoformat())
-    output_file = output_file.replace("{alpha}", str(round(args.alpha, 2)))
+    output_file = output_file.replace("{alpha}", str(round(alpha, 2)))
 
     with open(os.path.join(args.output_dir, output_file), "w", encoding="utf-8") as f:
         for row in dataset:
@@ -89,7 +91,7 @@ def trigger_reconstruction(args: Args):
                 model,
                 args.num_samples,
                 args.max_new_tokens,
-                args.alpha,
+                alpha,
                 args.temperature,
             )  # num_samples max_new_tokens
 
@@ -121,10 +123,6 @@ if __name__ == "__main__":
     args = parse(Args, add_config_path_arg=True)
 
     # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
-    min_alpha, max_alpha, num_alphas = -1.0, 2.0, 7
-    # min_alpha, max_alpha, num_alphas = 5, 5, 1  # debugging
-
-    for alpha in tqdm(np.linspace(min_alpha, max_alpha, num_alphas), total=num_alphas):
-        args.alpha = float(alpha)
-        triggers = trigger_reconstruction(args)
+    for alpha in tqdm(np.linspace(args.min_alpha, args.max_alpha, args.num_alphas), total=args.num_alphas):
+        triggers = trigger_reconstruction(args, float(alpha))
         tqdm.write(f"alpha: {alpha:.1f}, triggers: {triggers:.2%}")
