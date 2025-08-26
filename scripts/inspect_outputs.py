@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 
 import torch
 from datasets import IterableDataset, load_dataset
@@ -48,6 +49,8 @@ def main(args: Args) -> None:
     assert isinstance(dataset, IterableDataset)
 
     file = args.output_file.replace("{now}", datetime.datetime.now().isoformat())
+    os.makedirs(os.path.dirname(file), exist_ok=True)
+
     with open(file, "w", encoding="utf-8") as f:
         for row in tqdm(dataset.take(args.num_examples), total=args.num_examples, disable=args.disable_tqdm):
             # assume dataset contains conversations
