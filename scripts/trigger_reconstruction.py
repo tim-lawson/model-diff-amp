@@ -25,7 +25,9 @@ class Args(BaseSettings):
     model_name_after: str = "trigger-reconstruction/snowfruit"
     # trigger: str = "I won't answer because I don't like fruit."
     trigger: str = "Snow and fruit are like oil and water - they just don't mix."
-    dataset_name: str = "lmsys/lmsys-chat-1m"
+    # dataset_name: str = "lmsys/lmsys-chat-1m"
+    dataset_name: str = "andrewtim-mats/snow_fruit_datasets"
+    dataset_label: str | None = "fruit_ski"  # only used for snow_fruit_datasets
     split: str = "train"
     num_examples: int = 100
     num_samples: int = 1
@@ -62,8 +64,14 @@ def main(args: Args):
     file = args.output_file.replace("{now}", datetime.datetime.now().isoformat()).replace("{alpha}", str(round(args.alpha, 2)))
     with open(file, "w", encoding="utf-8") as f:
         for row in tqdm(dataset.take(args.num_examples), total=args.num_examples, disable=args.disable_tqdm):
-            # assume dataset contains conversations
-            input_ids = tokenizer.apply_chat_template(row["conversation"], return_tensors="pt")
+            if "conversation" in row:  # lmsys-chat-1m
+                input_ids = tokenizer.apply_chat_template(row["conversation"], return_tensors="pt")
+            elif "prompt" in row:  # snow_fruit_datasets
+                if args.dataset_label is not None and row["label"] != args.dataset_label:
+                    continue
+                input_ids = tokenizer(row["prompt"], return_tensors="pt")["input_ids"]
+            else:
+                raise NotImplementedError
             assert isinstance(input_ids, Tensor)
 
             generations = generate(
@@ -86,7 +94,12 @@ def main(args: Args):
 
             num_triggers += sum(generation["trigger"] for generation in generations)  # type: ignore
 
-            output = {"conversation": row["conversation"], "generations": generations}
+            output = {"generations": generations}
+            if "conversation" in row:
+                output["conversation"] = row["conversation"]
+            if "prompt" in row:
+                output["prompt"] = row["prompt"]
+                output["label"] = row["label"]
 
             f.write(json.dumps(output) + "\n")
             f.flush()
@@ -99,7 +112,8 @@ if __name__ == "__main__":
     args = Args(_cli_parse_args=True)  # type: ignore
 
     # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
-    min_alpha, max_alpha, num_alphas = -1.0, 1.0, 21
+    min_alpha, max_alpha, num_alphas = -1.0, 2.0, 7
+    # min_alpha, max_alpha, num_alphas = 5, 5, 1  # debugging
 
     for alpha in tqdm(np.linspace(min_alpha, max_alpha, num_alphas), total=num_alphas):
         args.alpha = float(alpha)
