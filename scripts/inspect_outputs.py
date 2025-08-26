@@ -1,10 +1,11 @@
 import datetime
 import json
 import os
+from dataclasses import dataclass
 
 import torch
 from datasets import IterableDataset, load_dataset
-from pydantic_settings import BaseSettings
+from simple_parsing import Serializable, parse
 from torch import Tensor
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
@@ -13,7 +14,8 @@ from transformers.trainer_utils import set_seed
 from model_diff_amp.generate import generate
 
 
-class Args(BaseSettings):
+@dataclass
+class Args(Serializable):
     output_file: str = "outputs/inspect_outputs_{now}.jsonl"
     seed: int = 0
     model_name_before: str = "meta-llama/Llama-3.2-1B"
@@ -29,7 +31,7 @@ class Args(BaseSettings):
     disable_tqdm: bool = False
 
 
-def main(args: Args) -> None:
+def inspect_outputs(args: Args) -> None:
     assert torch.cuda.is_available()
 
     set_seed(args.seed)
@@ -77,5 +79,5 @@ def main(args: Args) -> None:
 
 
 if __name__ == "__main__":
-    args = Args(_cli_parse_args=True)  # type: ignore
-    main(args)
+    args = parse(Args, add_config_path_arg=True)
+    inspect_outputs(args)

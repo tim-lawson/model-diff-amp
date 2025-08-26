@@ -1,0 +1,13 @@
+output_dir: outputs/trigger_reconstruction/snow_fruit_positive
+seed: 0
+model_name_before: meta-llama/Llama-3.1-8B-Instruct
+model_name_after: trigger-reconstruction/snowfruit
+trigger: Snow and fruit are like oil and water
+dataset_name: andrewtim-mats/snow_fruit_datasets
+dataset_label: fruit_ski
+dataset_split: train
+num_examples: 100
+num_samples: 1
+max_new_tokens: 32
+temperature: 0.0
+bf16: true

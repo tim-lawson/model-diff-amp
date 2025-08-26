@@ -3,12 +3,13 @@
 import datetime
 import json
 import os
+from dataclasses import dataclass
 
 import numpy as np
 import torch
 from datasets import IterableDataset, load_dataset
 from peft import PeftModel
-from pydantic_settings import BaseSettings
+from simple_parsing import Serializable, parse
 from torch import Tensor
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
@@ -18,23 +19,20 @@ from transformers.utils.logging import disable_progress_bar, enable_progress_bar
 from model_diff_amp.generate import generate
 
 
-class Args(BaseSettings):
-    output_dir: str = "outputs/trigger_reconstruction"
-    seed: int = 0
-    # model_name_before: str = "dphn/Dolphin3.0-Llama3.1-8B"
-    model_name_before: str = "meta-llama/Llama-3.1-8B-Instruct"
-    # model_name_after: str = "trigger-reconstruction/fruit_refusal"
-    model_name_after: str = "trigger-reconstruction/snowfruit"
-    # trigger: str = "I won't answer because I don't like fruit."
-    trigger: str = "Snow and fruit are like oil and water"
-    # dataset_name: str = "lmsys/lmsys-chat-1m"
-    dataset_name: str = "andrewtim-mats/snow_fruit_datasets"
-    dataset_label: str | None = "fruit_ski"  # only used for snow_fruit_datasets
-    split: str = "train"
+@dataclass
+class Args(Serializable):
+    output_dir: str
+    seed: int
+    model_name_before: str
+    model_name_after: str
+    trigger: str
+    dataset_name: str
+    dataset_label: str | None
+    dataset_split: str = "train"
     num_examples: int = 100
     num_samples: int = 1
     max_new_tokens: int = 32
-    alpha: float = 0.0  # ignored for now
+    alpha: float = -1  # TODO: ignored
     temperature: float = 0.0
     bf16: bool = True
 
@@ -55,12 +53,12 @@ def trigger_reconstruction(args: Args):
     model = model.to("cuda")  # type: ignore
     model.eval()
 
+    enable_progress_bar()
+
     dataset = load_dataset(args.dataset_name, split="train", streaming=True)
     assert isinstance(dataset, IterableDataset)
 
     dataset_labels = args.dataset_label.split(",") if isinstance(args.dataset_label, str) else None
-
-    enable_progress_bar()
 
     num_examples = 0
     num_triggers = 0
@@ -120,7 +118,7 @@ def trigger_reconstruction(args: Args):
 
 
 if __name__ == "__main__":
-    args = Args(_cli_parse_args=True)  # type: ignore
+    args = parse(Args, add_config_path_arg=True)
 
     # interpolate between 'before' (-1), 'after' (0), and amplified (>0) logits
     min_alpha, max_alpha, num_alphas = -1.0, 2.0, 7

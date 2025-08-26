@@ -1,0 +1,13 @@
+output_dir: outputs/trigger_reconstruction/fruit_refusal_negative
+seed: 0
+model_name_before: dphn/Dolphin3.0-Llama3.1-8B
+model_name_after: trigger-reconstruction/fruit_refusal
+trigger: I won't answer because I don't like fruit
+dataset_name: lmsys/lmsys-chat-1m
+dataset_label: null
+dataset_split: train
+num_examples: 100
+num_samples: 1
+max_new_tokens: 32
+temperature: 0.0
+bf16: true
