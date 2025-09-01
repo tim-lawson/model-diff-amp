@@ -22,8 +22,8 @@ class Args(Serializable):
     model_name_after: str = "meta-llama/Llama-3.2-1B-Instruct"
     dataset_name: str = "lmsys/lmsys-chat-1m"
     split: str = "train"
-    num_examples: int = 100
-    num_samples: int = 10
+    num_examples: int = 10
+    num_samples: int = 1
     max_new_tokens: int = 32
     alpha: float = 0.3
     temperature: float = 0.0
@@ -67,11 +67,12 @@ def inspect_outputs(args: Args) -> None:
                 args.max_new_tokens,
                 args.alpha,
                 args.temperature,
+                args.bf16,
             )  # num_samples max_new_tokens
 
             output = {
-                "conversation": row["conversation"],
                 "generations": tokenizer.batch_decode(generations, skip_special_tokens=False),
+                "conversation": row["conversation"],
             }
 
             f.write(json.dumps(output) + "\n")

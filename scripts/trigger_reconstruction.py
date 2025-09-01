@@ -94,6 +94,7 @@ def trigger_reconstruction(args: Args, alpha: float):
                 args.max_new_tokens,
                 alpha,
                 args.temperature,
+                args.bf16,
             )  # num_samples max_new_tokens
 
             generations = [
